@@ -26,6 +26,29 @@ class socketChat
         $this->master = $this->WebSocket($address, $port);//resource(2, Socket)  //服务器监听
         $this->sockets = array($this->master);//array (size=1) 0 => resource(2, Socket) 。运行两个php还是这样
     }
+
+    //创建服务器的socket的绑定和监听
+    function WebSocket($address,$port){
+        //创建socket并返回一个套接字resource，也称作一个通讯节点。一个典型的网络连接由 2 个套接字构成，一个运行在客户端，另一个运行在服务器端。
+        //AF_INET是协议的参数，SOCK_STREAM是类型的参数，SOL_TCP是具体协议
+        $server = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        //resource(2, Socket)
+        //file_put_contents('lz.text',$server, FILE_APPEND);//supplied resource is not a valid stream resource
+        //返回bool.套接字resource,协议级别,可用的socket选项,值。
+        $r = socket_set_option($server, SOL_SOCKET, SO_REUSEADDR, 1);//boolean true
+
+        //绑定 address 到 socket。 该操作必须是在使用 socket_connect() 或者 socket_listen() 建立一个连接之前。
+        $r2 = socket_bind($server, $address, $port);//boolean true
+
+
+        //在socket套接字已创建使用socket_create()定界与socket_bind()名称，它可以告诉听套接字传入的连接.
+        $r3 = socket_listen($server);//boolean true
+
+        $this->e('Server Started : '.date('Y-m-d H:i:s'));
+        $this->e('Listening on  : '.$address.' port '.$port);
+        return $server;
+    }
+
     public function run(){
 
         /*
@@ -33,7 +56,6 @@ class socketChat
         * 连接master,接受并创建一个子链接!
         * 分配一个唯一的key,并将字连接存储,代表当前这个连接的用户
         */
-
         while(true){
             $changes = $this->sockets;//$changes由多变1,但$this->sockets却只是稳定的+1;
             $write = NULL;
@@ -49,17 +71,9 @@ class socketChat
             2,初始状态返回为array(0=>resource(2, Socket),1=>resource(3,Socket))。
             客户来的客户为resource(3,Socket)。则返回的数据为resource(3,Socket).!!!
             */
-            // var_dump($changes);
             $rr = socket_select($changes,$write,$except,NULL);
-            // var_dump($changes);
-            // var_dump("---*---");
-            //exit;
 
-            // file_put_contents('./lz1.text',json_encode($changes), FILE_APPEND);
-            // file_put_contents('./lz.text','-----', FILE_APPEND);
             foreach($changes as $sock){
-                // var_dump($sock);
-                // var_dump("******");
                 //连接主机的client
                 //$this->master永远是 resource(2, Socket)。相当于一个缓存。两种情况,1:为空,使进程阻塞。2：存刚接收的client。
                 if($sock == $this->master){ //---此处只用来存数据了
@@ -69,16 +83,12 @@ class socketChat
                     //如果没有挂起的连接，socket_accept()将阻塞直到连接成为现在。如果使用了非阻塞套接字已socket_set_blocking()或socket_set_nonblock()，错误将返回。
                     //返回socket_accept()插座资源不得用于接受新的连接。原来的听插座插座，但是,仍然是开放的，可以重复使用。
                     $client = socket_accept($this->master); //resource(3, Socket)。表示接受请求,并创建一个子链接!!
-                    //var_dump($client);
-                    //exit;
                     $key = 'aaa'.rand(10000,99999);
                     $this->sockets[] = $client;
                     $this->users[$key] = array(
                         'socket' => $client,
                         'shou' => false
                     );
-                    // var_dump(1);
-                    // echo 1;
                     /*
                     array (size=1)
                     '57d607085f92a' =>  //$key
@@ -86,7 +96,6 @@ class socketChat
                     'socket' => resource(3, Socket) //$socket的表现都一样,只有通过$key区分
                     'shou' => boolean false
                     */
-                    // file_put_contents('lz.text',json_encode($this->users), FILE_APPEND);
                 }else{ //---此处服务器与客户端发信息
                     //发送消息时走此处
                     // echo 2;
@@ -152,27 +161,6 @@ class socketChat
             if($sock == $v['socket']) return $k;
         }
         return false;
-    }
-
-
-    function WebSocket($address,$port){ //服务器监听
-        //创建并返回一个套接字resource，也称作一个通讯节点。一个典型的网络连接由 2 个套接字构成，一个运行在客户端，另一个运行在服务器端。
-        //协议，类型，具体协议
-        $server = socket_create(AF_INET, SOCK_STREAM, SOL_TCP); //resource(2, Socket)
-        //file_put_contents('lz.text',$server, FILE_APPEND);//supplied resource is not a valid stream resource
-        //返回bool.套接字resource,协议级别,可用的socket选项,值。
-        $r = socket_set_option($server, SOL_SOCKET, SO_REUSEADDR, 1);//boolean true
-
-        //绑定 address 到 socket。 该操作必须是在使用 socket_connect() 或者 socket_listen() 建立一个连接之前。
-        $r2 = socket_bind($server, $address, $port);//boolean true
-
-
-        //在socket套接字已创建使用socket_create()定界与socket_bind()名称，它可以告诉听套接字传入的连接.
-        $r3 = socket_listen($server);//boolean true
-
-        $this->e('Server Started : '.date('Y-m-d H:i:s'));
-        $this->e('Listening on  : '.$address.' port '.$port);
-        return $server;
     }
 
     function woshou($k,$buffer){

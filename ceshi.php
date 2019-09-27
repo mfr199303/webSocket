@@ -9,6 +9,8 @@
 namespace App\Http\Controllers\v1_0;
 
 
+use function Couchbase\defaultDecoder;
+
 class ceshi
 {
     private $address;  //这是ip
@@ -36,6 +38,7 @@ class ceshi
        socket_listen($sock,$this->port); //开始监听端口
        echo "listen on $this->address $this->port ... \n";
        $this->_sockets = $sock; //把创建好并且设置完选项和监听端口的socket赋给_sockets变量
+       // 因为这个$this->_sockets变量不是用的数组 , 所以是单个两条
     }
 
     public function run()
@@ -46,21 +49,32 @@ class ceshi
             $changes = $clients;
             $write = NULL;
             $except = NULL;
-            socket_select($changes,  $write,  $except, NULL); //选择好对应的socket
+            //1.运行select()系统调用在给定阵列插座与指定的超时,作用是保存可以操作的socket链接
+            //2.没有接收到数据就会一直处于阻塞状态,
+            //3.若没有client过来,直阻塞进程,直到有client访问,返回1。
+            //4.此时返回的changes,不是曾经的changes。虽然还只是一条记录,但已经不是服务器而是客户端
+
+            /*select的特殊作用：！！！！！！！
+            初始为array(0=>resource(2, Socket))
+            1,初始状态返回为array(0=>resource(2, Socket))。但socket_accept可以得到resource(3, Socket)
+            2,初始状态返回为array(0=>resource(2, Socket),1=>resource(3,Socket))。
+            客户来的客户为resource(3,Socket)。则返回的数据为resource(3,Socket).!!!
+            */
+            socket_select($changes,  $write,  $except, NULL);
             foreach ($changes as $key => $_sock){
                 if($this->_sockets == $_sock){ //判断是不是新接入的socket
                     if(($newClient = socket_accept($_sock))  === false){ //如果错误的socket就报错
                         die('failed to accept socket: '.socket_strerror($_sock)."\n");
                     }
-                    $line = trim(socket_read($newClient, 1024)); //按照指定数据长度length参数去取出socket里的数据
+                    $line = trim(socket_read($newClient, 1024)); //按照指定数据长度length参数去取出客户端发给服务端socket里的数据
                     $this->handshaking($newClient, $line); //调用的这个自己封装的方法 , 把取出来的数据和header参数都缓存到socket中
                     //获取client ip
                     socket_getpeername ($newClient, $ip); //获取到客户端的主机ip地址,写进数组
                     $clients[$ip] = $newClient;
-                    echo  "Client ip:{$ip}   \n";
+                    echo "Client ip:{$ip}    \n";
                     echo "Client msg:{$line} \n";
                 } else {
-                    socket_recv($_sock, $buffer,  2048, 0); //把数组写到缓存中
+                    socket_recv($_sock, $buffer,  2048, 0); //读取消息
                     $msg = $this->message($buffer);
                     //在这里业务代码
                     echo "{$key} clinet msg:",$msg,"\n";
