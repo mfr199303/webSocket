@@ -13,6 +13,7 @@ use function Couchbase\defaultDecoder;
 
 class ceshi
 {
+    //这是根据ip去区分的多人聊天
     private $address;  //这是ip
     private $port;     //这是端口号
     private $_sockets; //这是声明的保存socket信息的公共变量
@@ -62,7 +63,7 @@ class ceshi
             */
             socket_select($changes,  $write,  $except, NULL);
             foreach ($changes as $key => $_sock){
-                if($this->_sockets == $_sock){ //判断是不是新接入的socket
+                if($this->_sockets == $_sock){ //这里是保存客户端发送的和服务端回复的信息
                     if(($newClient = socket_accept($_sock))  === false){ //如果错误的socket就报错
                         die('failed to accept socket: '.socket_strerror($_sock)."\n");
                     }
@@ -73,7 +74,7 @@ class ceshi
                     $clients[$ip] = $newClient;
                     echo "Client ip:{$ip}    \n";
                     echo "Client msg:{$line} \n";
-                } else {
+                } else {   //else里才是服务器和客户端通信的逻辑写在这
                     socket_recv($_sock, $buffer,  2048, 0); //读取消息
                     $msg = $this->message($buffer);
                     //在这里业务代码
